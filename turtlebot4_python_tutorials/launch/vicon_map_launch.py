@@ -7,39 +7,26 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, GroupAction, SetEnvironmentVariable
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch_ros.actions import LoadComposableNodes
 from launch_ros.actions import Node
+from launch_ros.descriptions import ComposableNode
 from nav2_common.launch import RewrittenYaml
 from launch_ros.actions import PushRosNamespace
 
-# ARGUMENTS = [
-#     DeclareLaunchArgument('use_sim_time', default_value='true',
-#                           choices=['true', 'false'],
-#                           description='Use sim time'),
-#     DeclareLaunchArgument('namespace', default_value='',
-#                           description='Robot namespace')
-# ]
-
-
 def generate_launch_description():
     # Get the launch directory
-    bringup_dir = get_package_share_directory('nav2_bringup')
     pkg_turtlebot4_navigation = get_package_share_directory('turtlebot4_navigation')
 
     namespace = LaunchConfiguration('namespace')
     use_namespace = LaunchConfiguration('use_namespace')
+    map_yaml_file = LaunchConfiguration('map')
     use_sim_time = LaunchConfiguration('use_sim_time')
     autostart = LaunchConfiguration('autostart')
     params_file = LaunchConfiguration('params_file')
     use_respawn = LaunchConfiguration('use_respawn')
     log_level = LaunchConfiguration('log_level')
 
-    lifecycle_nodes = ['controller_server',
-                       'smoother_server',
-                       'planner_server',
-                       'behavior_server',
-                       'bt_navigator',
-                       'waypoint_follower',
-                       'velocity_smoother']
+    lifecycle_nodes = ['map_server']
 
     # Map fully qualified names to relative ones so the node's namespace can be prepended.
     # In case of the transforms (tf), currently, there doesn't seem to be a better alternative
@@ -53,7 +40,7 @@ def generate_launch_description():
     # Create our own temporary YAML files that include substitutions
     param_substitutions = {
         'use_sim_time': use_sim_time,
-        'autostart': autostart}
+        'yaml_filename': map_yaml_file}
 
     configured_params = RewrittenYaml(
         source_file=params_file,
@@ -74,6 +61,11 @@ def generate_launch_description():
         default_value='false',
         description='Whether to apply a namespace to the navigation stack')
 
+    declare_map_yaml_cmd = DeclareLaunchArgument(
+        'map',
+        default_value="/sharedDrive/map/map_name.yaml",
+        description='Full path to map yaml file to load')
+
     declare_use_sim_time_cmd = DeclareLaunchArgument(
         'use_sim_time',
         default_value='true',
@@ -81,7 +73,7 @@ def generate_launch_description():
 
     declare_params_file_cmd = DeclareLaunchArgument(
         'params_file',
-        default_value=os.path.join(pkg_turtlebot4_navigation, 'config', 'nav2.yaml'),
+        default_value=os.path.join(pkg_turtlebot4_navigation, 'config', 'localization.yaml'),
         # default_value=os.path.join(bringup_dir, 'params', 'nav2_params.yaml'),
         description='Full path to the ROS2 parameters file to use for all launched nodes')
 
@@ -97,85 +89,27 @@ def generate_launch_description():
         'log_level', default_value='info',
         description='log level')
 
-    load_navigation = GroupAction(
+
+    load_map = GroupAction(
         actions=[
             PushRosNamespace(
                 condition=IfCondition(use_namespace),
                 namespace=namespace),
             Node(
-                package='nav2_controller',
-                executable='controller_server',
-                output='screen',
-                respawn=use_respawn,
-                respawn_delay=2.0,
-                parameters=[configured_params],
-                arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings + [('cmd_vel', 'cmd_vel_nav')]),
-            Node(
-                package='nav2_smoother',
-                executable='smoother_server',
-                name='smoother_server',
+                package='nav2_map_server',
+                executable='map_server',
+                name='map_server',
                 output='screen',
                 respawn=use_respawn,
                 respawn_delay=2.0,
                 parameters=[configured_params],
                 arguments=['--ros-args', '--log-level', log_level],
                 remappings=remappings),
-            Node(
-                package='nav2_planner',
-                executable='planner_server',
-                name='planner_server',
-                output='screen',
-                respawn=use_respawn,
-                respawn_delay=2.0,
-                parameters=[configured_params],
-                arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings),
-            Node(
-                package='nav2_behaviors',
-                executable='behavior_server',
-                name='behavior_server',
-                output='screen',
-                respawn=use_respawn,
-                respawn_delay=2.0,
-                parameters=[configured_params],
-                arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings),
-            Node(
-                package='nav2_bt_navigator',
-                executable='bt_navigator',
-                name='bt_navigator',
-                output='screen',
-                respawn=use_respawn,
-                respawn_delay=2.0,
-                parameters=[configured_params],
-                arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings),
-            Node(
-                package='nav2_waypoint_follower',
-                executable='waypoint_follower',
-                name='waypoint_follower',
-                output='screen',
-                respawn=use_respawn,
-                respawn_delay=2.0,
-                parameters=[configured_params],
-                arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings),
-            Node(
-                package='nav2_velocity_smoother',
-                executable='velocity_smoother',
-                name='velocity_smoother',
-                output='screen',
-                respawn=use_respawn,
-                respawn_delay=2.0,
-                parameters=[configured_params],
-                arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings +
-                           [('cmd_vel', 'cmd_vel_nav'), ('cmd_vel_smoothed', 'cmd_vel')]),
+
             Node(
                 package='nav2_lifecycle_manager',
                 executable='lifecycle_manager',
-                name='lifecycle_manager_navigation',
+                name='lifecycle_manager_localization',
                 output='screen',
                 arguments=['--ros-args', '--log-level', log_level],
                 parameters=[{'use_sim_time': use_sim_time},
@@ -183,19 +117,7 @@ def generate_launch_description():
                             {'node_names': lifecycle_nodes}]),
         ]
     )
-    load_vicon = GroupAction(
-        actions=[
-            PushRosNamespace(
-                condition=IfCondition(use_namespace),
-                namespace=namespace),
-            Node(
-                package='turtlebot4_python_tutorials',
-                executable='dummy_odom_pub',
-                name='dummy_odom_pub',
-                output='screen',
-                remappings=remappings),
-        ]
-    )
+
 
     # Create the launch description and populate
     ld = LaunchDescription()
@@ -206,6 +128,7 @@ def generate_launch_description():
     # Declare the launch options
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_use_namespace_cmd)
+    ld.add_action(declare_map_yaml_cmd)
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_params_file_cmd)
     ld.add_action(declare_autostart_cmd)
@@ -213,8 +136,7 @@ def generate_launch_description():
     ld.add_action(declare_log_level_cmd)
 
     # Add the actions to launch all of the localiztion nodes
-    ld.add_action(load_navigation)
-    ld.add_action(load_vicon)
+    ld.add_action(load_map)
     # ld.add_action(load_composable_nodes)
 
     return ld
