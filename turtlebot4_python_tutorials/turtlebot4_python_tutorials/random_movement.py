@@ -28,10 +28,16 @@ from rclpy.qos import qos_profile_sensor_data
 
 from sensor_msgs.msg import BatteryState
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, TurtleBot4Navigator
+import numpy as np
 
 BATTERY_HIGH = 0.95
 BATTERY_LOW = 0.2  # when the robot will go charge
 BATTERY_CRITICAL = 0.1  # when the robot will shutdown
+
+x_low = -3
+x_high = 3
+y_low = -3
+y_high = 3
 
 
 class BatteryMonitor(Node):
@@ -40,7 +46,7 @@ class BatteryMonitor(Node):
         super().__init__('battery_monitor')
 
         self.lock = lock
-
+        self.battery_percent=50.
         # Subscribe to the /battery_state topic
         self.battery_state_subscriber = self.create_subscription(
             BatteryState,
@@ -72,34 +78,17 @@ def main(args=None):
     thread = Thread(target=battery_monitor.thread_function, daemon=True)
     thread.start()
 
-    # Start on dock
-    if not navigator.getDockedStatus():
-        navigator.info('Docking before intialising pose')
-        navigator.dock()
-
-    # Set initial pose
-    initial_pose = navigator.getPoseStamped([0.0, 0.0], TurtleBot4Directions.NORTH)
-    navigator.setInitialPose(initial_pose)
-
     # Wait for Nav2
-    navigator.waitUntilNav2Active()
+    #navigator.waitUntilNav2Active()
 
     # Undock
-    navigator.undock()
+    if navigator.getDockedStatus():
+        navigator.undock()
 
-    # Prepare goal poses
-    goal_pose = []
-    goal_pose.append(navigator.getPoseStamped([-1., .0], TurtleBot4Directions.WEST))
-    goal_pose.append(navigator.getPoseStamped([-3., 0.], TurtleBot4Directions.SOUTH))
-    goal_pose.append(navigator.getPoseStamped([-3., -2.], TurtleBot4Directions.EAST))
-    goal_pose.append(navigator.getPoseStamped([-1., -2.], TurtleBot4Directions.NORTH))
-    #goal_pose.append(navigator.getPoseStamped([9.0, -23.0], TurtleBot4Directions.NORTH_WEST))
-    #goal_pose.append(navigator.getPoseStamped([10.0, 2.0], TurtleBot4Directions.WEST))
 
     while True:
         with lock:
             battery_percent = battery_monitor.battery_percent
-
         if (battery_percent is not None):
             navigator.info(f'Battery is at {(battery_percent*100):.2f}% charge')
 
@@ -107,41 +96,16 @@ def main(args=None):
             if (battery_percent < BATTERY_CRITICAL):
                 navigator.error('Battery critically low. Charge or power down')
                 break
-            elif (battery_percent < BATTERY_LOW):
-                # Go near the dock
-                navigator.info('Docking for charge')
-                navigator.startToPose(navigator.getPoseStamped([-1.0, 1.0],
-                                      TurtleBot4Directions.EAST))
-                navigator.dock()
-
-                if not navigator.getDockedStatus():
-                    navigator.error('Robot failed to dock')
-                    break
-
-                # Wait until charged
-                navigator.info('Charging...')
-                battery_percent_prev = 0
-                while (battery_percent < BATTERY_HIGH):
-                    sleep(15)
-                    battery_percent_prev = floor(battery_percent*100)/100
-                    with lock:
-                        battery_percent = battery_monitor.battery_percent
-
-                    # Print charge level every time it increases a percent
-                    if battery_percent > (battery_percent_prev + 0.01):
-                        navigator.info(f'Battery is at {(battery_percent*100):.2f}% charge')
-
-                # Undock
-                navigator.undock()
-                position_index = 0
 
             else:
-                # Navigate to next position
-                navigator.startToPose(goal_pose[position_index])
+                # maybe use to get the vicon coordinates: navigator.setInitialPose(initial_pose)
 
-                position_index = position_index + 1
-                if position_index >= len(goal_pose):
-                    position_index = 0
+                # Navigate to next position
+                position = [np.random.uniform(x_low, x_high), np.random.uniform(y_low, y_high)]
+                orientation = np.random.uniform(0, 359)
+                goal_pose = navigator.getPoseStamped(position,  orientation)
+                print("moving to position: ", position, " orientation: ", orientation)
+                navigator.startToPose(goal_pose)
 
     battery_monitor.destroy_node()
     rclpy.shutdown()

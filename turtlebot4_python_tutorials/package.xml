@@ -13,9 +13,10 @@
   <test_depend>python3-pytest</test_depend>
  
   <depend>irobot_create_msgs</depend>
+  <depend>nav_msgs</depend>
   <depend>rclpy</depend>
   <depend>turtlebot4_navigation</depend>
-
+  <exec_depend>ros2launch</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>

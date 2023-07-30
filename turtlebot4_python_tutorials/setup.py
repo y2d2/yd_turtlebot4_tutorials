@@ -1,4 +1,6 @@
 from setuptools import setup
+import os
+from glob import glob
 
 package_name = 'turtlebot4_python_tutorials'
 
@@ -10,6 +12,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name), glob('launch/*.launch.py')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -28,6 +31,8 @@ setup(
             'create_path = turtlebot4_python_tutorials.create_path:main',
             'patrol_loop = turtlebot4_python_tutorials.patrol_loop:main',
             'mail_delivery = turtlebot4_python_tutorials.mail_delivery:main',
+            'random_movement = turtlebot4_python_tutorials.random_movement:main',
+            'dummy_odom_pub = turtlebot4_python_tutorials.dummy_odom_pub:main',
         ],
     },
 )
