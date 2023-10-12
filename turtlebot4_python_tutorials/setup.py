@@ -13,6 +13,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name), glob('launch/*.launch.py')),
+        (os.path.join("share", package_name), glob("config/*.yaml")),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -33,6 +34,8 @@ setup(
             'mail_delivery = turtlebot4_python_tutorials.mail_delivery:main',
             'random_movement = turtlebot4_python_tutorials.random_movement:main',
             'dummy_odom_pub = turtlebot4_python_tutorials.dummy_odom_pub:main',
+            'test_vicon = turtlebot4_python_tutorials.test_vicon:main',
+            'tf_odom_broadcaster = turtlebot4_python_tutorials.tf_odom_broadcaster:main',
         ],
     },
 )

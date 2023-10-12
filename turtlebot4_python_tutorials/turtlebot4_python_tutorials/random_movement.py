@@ -65,49 +65,66 @@ class BatteryMonitor(Node):
         executor.spin()
 
 
+class RandomMovement(Node):
+    def __init__(self):
+        super().__init__('Random_movement_node')
+        self.declare_parameter('x_low', -3.)
+        self.declare_parameter('x_high', 3.)
+        self.declare_parameter('y_low', -3.)
+        self.declare_parameter('y_high', 3.)
+
+        self.lock = Lock()
+        self.battery_monitor = BatteryMonitor(self.lock)
+
+
+        self.navigator = TurtleBot4Navigator()
+
+        thread = Thread(target=self.battery_monitor.thread_function, daemon=True)
+        thread.start()
+
+        # Wait for Nav2
+        #navigator.waitUntilNav2Active()
+        print("waiting for nav2")
+        # Undock
+        print(self.navigator.getDockedStatus())
+        if self.navigator.getDockedStatus():
+            self.navigator.undock()
+
+    def run(self):
+        x_low = self.get_parameter('x_low').value
+        x_high = self.get_parameter('x_high').value
+        y_low = self.get_parameter('y_low').value
+        y_high = self.get_parameter('y_high').value
+        print(x_low, x_high, y_low, y_high)
+        while True:
+            with self.lock:
+                battery_percent = self.battery_monitor.battery_percent
+            if (battery_percent is not None):
+                self.navigator.info(f'Battery is at {(battery_percent*100):.2f}% charge')
+
+                # Check battery charge level
+                if (battery_percent < BATTERY_LOW):
+                    self.navigator.info('Battery critically low. Shutting down')
+                    #self.navigator.error('Battery critically low. Charge or power down')
+                    break
+
+                else:
+                    # maybe use to get the vicon coordinates: navigator.setInitialPose(initial_pose)
+
+                    # Navigate to next position
+                    position = [np.random.uniform(x_low, x_high), np.random.uniform(y_low, y_high)]
+                    orientation = np.random.uniform(0, 359)
+                    goal_pose = self.navigator.getPoseStamped(position,  orientation)
+                    print("moving to position: ", position, " orientation: ", orientation)
+                    self.navigator.startToPose(goal_pose)
+
+        self.battery_monitor.destroy_node()
+
 def main(args=None):
     rclpy.init(args=args)
-    print(args)
-    lock = Lock()
-    battery_monitor = BatteryMonitor(lock)
-
-    navigator = TurtleBot4Navigator()
-    battery_percent = None
-    position_index = 0
-
-    thread = Thread(target=battery_monitor.thread_function, daemon=True)
-    thread.start()
-
-    # Wait for Nav2
-    #navigator.waitUntilNav2Active()
-
-    # Undock
-    if navigator.getDockedStatus():
-        navigator.undock()
-
-
-    while True:
-        with lock:
-            battery_percent = battery_monitor.battery_percent
-        if (battery_percent is not None):
-            navigator.info(f'Battery is at {(battery_percent*100):.2f}% charge')
-
-            # Check battery charge level
-            if (battery_percent < BATTERY_CRITICAL):
-                navigator.error('Battery critically low. Charge or power down')
-                break
-
-            else:
-                # maybe use to get the vicon coordinates: navigator.setInitialPose(initial_pose)
-
-                # Navigate to next position
-                position = [np.random.uniform(x_low, x_high), np.random.uniform(y_low, y_high)]
-                orientation = np.random.uniform(0, 359)
-                goal_pose = navigator.getPoseStamped(position,  orientation)
-                print("moving to position: ", position, " orientation: ", orientation)
-                navigator.startToPose(goal_pose)
-
-    battery_monitor.destroy_node()
+    rand_movement = RandomMovement()
+    rand_movement.run()
+    rand_movement.destroy_node()
     rclpy.shutdown()
 
 

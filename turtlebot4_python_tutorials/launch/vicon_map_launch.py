@@ -117,7 +117,19 @@ def generate_launch_description():
                             {'node_names': lifecycle_nodes}]),
         ]
     )
-
+    load_vicon = GroupAction(
+        actions=[
+            PushRosNamespace(
+                condition=IfCondition(use_namespace),
+                namespace=namespace),
+            Node(
+                package='turtlebot4_python_tutorials',
+                executable='dummy_odom_pub',
+                name='dummy_odom_pub',
+                output='screen',
+                remappings=remappings),
+        ]
+    )
 
     # Create the launch description and populate
     ld = LaunchDescription()
@@ -137,6 +149,8 @@ def generate_launch_description():
 
     # Add the actions to launch all of the localiztion nodes
     ld.add_action(load_map)
+    ld.add_action(load_vicon)
+
     # ld.add_action(load_composable_nodes)
 
     return ld

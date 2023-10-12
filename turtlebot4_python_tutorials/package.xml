@@ -17,6 +17,7 @@
   <depend>rclpy</depend>
   <depend>turtlebot4_navigation</depend>
   <exec_depend>ros2launch</exec_depend>
+  <exec_depend>vicon_receiver</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>
